@@ -1,6 +1,17 @@
 # godot-lsp-bridge
 
+[![npm version](https://badge.fury.io/js/godot-lsp-bridge.svg)](https://www.npmjs.com/package/godot-lsp-bridge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A stdio-to-TCP bridge for Godot's GDScript Language Server. Enables AI coding agents to use Godot's LSP for code intelligence.
+
+## Sponsors
+
+<a href="https://www.redimo.dev/" target="_blank">
+  <img src="https://www.redimo.dev/logo/logo.png" alt="Redimo - The Ultimate Redis GUI Client" width="120" />
+</a>
+
+**[Redimo](https://www.redimo.dev/)** - The Ultimate Redis GUI Client. Visualize, Manage, and Monitor.
 
 ## Why?
 
@@ -163,10 +174,16 @@ GODOT_LSP_PORT=6008 npx godot-lsp-bridge
 └─────────────────┘                └─────────────────┘                └─────────────────┘
 ```
 
+## Acknowledgments
+
+- [Godot Engine](https://godotengine.org/) - The open-source game engine that provides the GDScript Language Server
+- [Redimo](https://www.redimo.dev/) - The Ultimate Redis GUI Client
+- [Disunday](https://github.com/code-xhyun/disunday) - Control OpenCode from Discord
+
 ## License
 
 MIT
 
 ## Contributing
 
-Issues and PRs welcome at [GitHub](https://github.com/corbin/godot-lsp-bridge).
+Issues and PRs welcome at [GitHub](https://github.com/code-xhyun/godot-lsp-bridge).

@@ -26,16 +26,19 @@
     "godot-engine",
     "code-intelligence"
   ],
-  "author": "Corbin",
+  "author": {
+    "name": "SH-Hong",
+    "url": "https://github.com/code-xhyun"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/corbin/godot-lsp-bridge.git"
+    "url": "git+https://github.com/code-xhyun/godot-lsp-bridge.git"
   },
   "bugs": {
-    "url": "https://github.com/corbin/godot-lsp-bridge/issues"
+    "url": "https://github.com/code-xhyun/godot-lsp-bridge/issues"
   },
-  "homepage": "https://github.com/corbin/godot-lsp-bridge#readme",
+  "homepage": "https://github.com/code-xhyun/godot-lsp-bridge#readme",
   "engines": {
     "node": ">=18.0.0"
   },
