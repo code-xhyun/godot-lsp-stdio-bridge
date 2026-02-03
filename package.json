@@ -1,0 +1,47 @@
+{
+  "name": "godot-lsp-bridge",
+  "version": "1.0.0",
+  "description": "GDScript LSP bridge for AI coding agents - stdio to TCP bridge for Godot's Language Server",
+  "main": "index.mjs",
+  "bin": {
+    "godot-lsp-bridge": "./index.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "keywords": [
+    "godot",
+    "gdscript",
+    "lsp",
+    "language-server",
+    "stdio",
+    "tcp",
+    "bridge",
+    "cursor",
+    "claude-code",
+    "opencode",
+    "ai-coding",
+    "game-development",
+    "godot-engine",
+    "code-intelligence"
+  ],
+  "author": "Corbin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/corbin/godot-lsp-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/corbin/godot-lsp-bridge/issues"
+  },
+  "homepage": "https://github.com/corbin/godot-lsp-bridge#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "index.mjs",
+    "README.md",
+    "LICENSE"
+  ]
+}
