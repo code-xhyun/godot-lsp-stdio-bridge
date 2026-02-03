@@ -1,6 +1,6 @@
-# godot-lsp-bridge
+# godot-lsp-stdio-bridge
 
-[![npm version](https://badge.fury.io/js/godot-lsp-bridge.svg)](https://www.npmjs.com/package/godot-lsp-bridge)
+[![npm version](https://badge.fury.io/js/godot-lsp-stdio-bridge.svg)](https://www.npmjs.com/package/godot-lsp-stdio-bridge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A stdio-to-TCP bridge for Godot's GDScript Language Server. Enables AI coding agents to use Godot's LSP for code intelligence.
@@ -30,12 +30,12 @@ Most AI coding tools (Claude Code, Cursor, OpenCode, etc.) expect LSP servers to
 ## Installation
 
 ```bash
-npm install -g godot-lsp-bridge
+npm install -g godot-lsp-stdio-bridge
 ```
 
 Or use directly with npx:
 ```bash
-npx godot-lsp-bridge
+npx godot-lsp-stdio-bridge
 ```
 
 ## Configuration
@@ -48,7 +48,7 @@ Add to `~/.config/opencode/opencode.json`:
 {
   "lsp": {
     "gdscript": {
-      "command": ["npx", "godot-lsp-bridge"],
+      "command": ["npx", "godot-lsp-stdio-bridge"],
       "extensions": [".gd", ".gdshader"]
     }
   }
@@ -63,7 +63,7 @@ Add to your MCP settings or Claude configuration:
 {
   "lsp": {
     "gdscript": {
-      "command": ["npx", "godot-lsp-bridge"],
+      "command": ["npx", "godot-lsp-stdio-bridge"],
       "extensions": [".gd"]
     }
   }
@@ -77,7 +77,7 @@ In Cursor settings, add a custom language server:
 ```json
 {
   "gdscript": {
-    "command": ["npx", "godot-lsp-bridge"],
+    "command": ["npx", "godot-lsp-stdio-bridge"],
     "filetypes": ["gdscript"]
   }
 }
@@ -90,7 +90,7 @@ In Cursor settings, add a custom language server:
   "languageserver": {
     "gdscript": {
       "command": "npx",
-      "args": ["godot-lsp-bridge"],
+      "args": ["godot-lsp-stdio-bridge"],
       "filetypes": ["gdscript"],
       "rootPatterns": ["project.godot"]
     }
@@ -106,7 +106,7 @@ local configs = require('lspconfig.configs')
 
 configs.gdscript_bridge = {
   default_config = {
-    cmd = { 'npx', 'godot-lsp-bridge' },
+    cmd = { 'npx', 'godot-lsp-stdio-bridge' },
     filetypes = { 'gdscript' },
     root_dir = lspconfig.util.root_pattern('project.godot'),
   },
@@ -122,7 +122,7 @@ lspconfig.gdscript_bridge.setup{}
 | `GODOT_LSP_PORT` | `6005` | Godot LSP server port |
 | `GODOT_LSP_HOST` | `127.0.0.1` | Godot LSP server host |
 | `GODOT_LSP_BRIDGE_DEBUG` | `false` | Enable debug logging |
-| `GODOT_LSP_BRIDGE_LOG` | `/tmp/godot-lsp-bridge.log` | Log file path |
+| `GODOT_LSP_BRIDGE_LOG` | `/tmp/godot-lsp-stdio-bridge.log` | Log file path |
 
 ## Usage
 
@@ -151,17 +151,17 @@ Make sure Godot Editor is running with your project open. The LSP server only ru
 ### Enable debug logging
 
 ```bash
-GODOT_LSP_BRIDGE_DEBUG=true npx godot-lsp-bridge
+GODOT_LSP_BRIDGE_DEBUG=true npx godot-lsp-stdio-bridge
 ```
 
-Check logs at `/tmp/godot-lsp-bridge.log`
+Check logs at `/tmp/godot-lsp-stdio-bridge.log`
 
 ### Custom port
 
 If Godot uses a different port:
 
 ```bash
-GODOT_LSP_PORT=6008 npx godot-lsp-bridge
+GODOT_LSP_PORT=6008 npx godot-lsp-stdio-bridge
 ```
 
 ## How it works
@@ -186,4 +186,4 @@ MIT
 
 ## Contributing
 
-Issues and PRs welcome at [GitHub](https://github.com/code-xhyun/godot-lsp-bridge).
+Issues and PRs welcome at [GitHub](https://github.com/code-xhyun/godot-lsp-stdio-bridge).
