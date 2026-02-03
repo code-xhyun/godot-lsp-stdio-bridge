@@ -1,6 +1,11 @@
-# godot-lsp-bridge
+# godot-lsp-stdio-bridge
+
+[![npm version](https://badge.fury.io/js/godot-lsp-stdio-bridge.svg)](https://www.npmjs.com/package/godot-lsp-stdio-bridge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A stdio-to-TCP bridge for Godot's GDScript Language Server. Enables AI coding agents to use Godot's LSP for code intelligence.
+
+**npm**: https://www.npmjs.com/package/godot-lsp-stdio-bridge
 
 ## Why?
 
@@ -28,12 +33,12 @@ Most AI coding tools (Claude Code, Cursor, OpenCode, etc.) expect LSP servers to
 ## Installation
 
 ```bash
-npm install -g godot-lsp-bridge
+npm install -g godot-lsp-stdio-bridge
 ```
 
 Or use directly with npx:
 ```bash
-npx godot-lsp-bridge
+npx godot-lsp-stdio-bridge
 ```
 
 ## Configuration
@@ -46,7 +51,7 @@ Add to `~/.config/opencode/opencode.json`:
 {
   "lsp": {
     "gdscript": {
-      "command": ["npx", "godot-lsp-bridge"],
+      "command": ["npx", "godot-lsp-stdio-bridge"],
       "extensions": [".gd", ".gdshader"]
     }
   }
@@ -61,7 +66,7 @@ Add to your MCP settings or Claude configuration:
 {
   "lsp": {
     "gdscript": {
-      "command": ["npx", "godot-lsp-bridge"],
+      "command": ["npx", "godot-lsp-stdio-bridge"],
       "extensions": [".gd"]
     }
   }
@@ -75,7 +80,7 @@ In Cursor settings, add a custom language server:
 ```json
 {
   "gdscript": {
-    "command": ["npx", "godot-lsp-bridge"],
+    "command": ["npx", "godot-lsp-stdio-bridge"],
     "filetypes": ["gdscript"]
   }
 }
@@ -88,7 +93,7 @@ In Cursor settings, add a custom language server:
   "languageserver": {
     "gdscript": {
       "command": "npx",
-      "args": ["godot-lsp-bridge"],
+      "args": ["godot-lsp-stdio-bridge"],
       "filetypes": ["gdscript"],
       "rootPatterns": ["project.godot"]
     }
@@ -104,7 +109,7 @@ local configs = require('lspconfig.configs')
 
 configs.gdscript_bridge = {
   default_config = {
-    cmd = { 'npx', 'godot-lsp-bridge' },
+    cmd = { 'npx', 'godot-lsp-stdio-bridge' },
     filetypes = { 'gdscript' },
     root_dir = lspconfig.util.root_pattern('project.godot'),
   },
@@ -121,7 +126,7 @@ On Windows, npm creates `.cmd` wrapper scripts for global packages:
 {
   "lsp": {
     "gdscript": {
-      "command": ["godot-lsp-bridge.cmd"],
+      "command": ["godot-lsp-stdio-bridge.cmd"],
       "extensions": [".gd"]
     }
   }
@@ -135,7 +140,7 @@ On Windows, npm creates `.cmd` wrapper scripts for global packages:
 | `GODOT_LSP_PORT` | Auto-discover | Fixed port (skips auto-discovery if set) |
 | `GODOT_LSP_HOST` | `127.0.0.1` | Godot LSP server host |
 | `GODOT_LSP_BRIDGE_DEBUG` | `false` | Enable debug logging |
-| `GODOT_LSP_BRIDGE_LOG` | `/tmp/godot-lsp-bridge.log` | Log file path (Windows: `%TEMP%\godot-lsp-bridge.log`) |
+| `GODOT_LSP_BRIDGE_LOG` | `/tmp/godot-lsp-stdio-bridge.log` | Log file path (Windows: `%TEMP%\godot-lsp-stdio-bridge.log`) |
 
 ## Usage
 
@@ -160,7 +165,7 @@ Once connected, you get full GDScript LSP features:
 ```
 ┌─────────────────┐     stdio      ┌─────────────────┐      TCP       ┌─────────────────┐
 │   AI Coding     │ ─────────────► │  godot-lsp-     │ ─────────────► │   Godot LSP     │
-│   Agent         │ ◄───────────── │  bridge         │ ◄───────────── │   Server        │
+│   Agent         │ ◄───────────── │  stdio-bridge   │ ◄───────────── │   Server        │
 │ (Claude, etc.)  │                │                 │                │   (port 6005)   │
 └─────────────────┘                └─────────────────┘                └─────────────────┘
 ```
@@ -188,17 +193,17 @@ Make sure Godot Editor is running with your project open. The LSP server only ru
 ### Enable debug logging
 
 ```bash
-GODOT_LSP_BRIDGE_DEBUG=true npx godot-lsp-bridge
+GODOT_LSP_BRIDGE_DEBUG=true npx godot-lsp-stdio-bridge
 ```
 
-Check logs at `/tmp/godot-lsp-bridge.log` (Linux/macOS) or `%TEMP%\godot-lsp-bridge.log` (Windows)
+Check logs at `/tmp/godot-lsp-stdio-bridge.log` (Linux/macOS) or `%TEMP%\godot-lsp-stdio-bridge.log` (Windows)
 
 ### Custom port
 
 If Godot uses a different port:
 
 ```bash
-GODOT_LSP_PORT=6008 npx godot-lsp-bridge
+GODOT_LSP_PORT=6008 npx godot-lsp-stdio-bridge
 ```
 
 ### Large file issues
@@ -207,8 +212,8 @@ This bridge uses binary-safe `Buffer.concat()` instead of string concatenation, 
 
 ## Comparison with other bridges
 
-| Feature | godot-lsp-bridge (this) | opencode-godot-lsp | godot-lsp-bridge (can0pus) |
-|---------|------------------------|--------------------|-----------------------------|
+| Feature | godot-lsp-stdio-bridge (this) | opencode-godot-lsp | godot-lsp-bridge (can0pus) |
+|---------|------------------------------|--------------------|-----------------------------|
 | Binary-safe buffers | ✅ `Buffer.concat()` | ❌ `.toString()` | ❌ `.toString()` |
 | Auto port discovery | ✅ 6005, 6007, 6008 | ❌ | ✅ |
 | Auto reconnection | ✅ | ❌ | ✅ |
@@ -223,4 +228,17 @@ MIT
 
 ## Contributing
 
-Issues and PRs welcome at [GitHub](https://github.com/corbin/godot-lsp-bridge).
+Issues and PRs welcome at [GitHub](https://github.com/code-xhyun/godot-lsp-stdio-bridge).
+
+## Acknowledgments
+
+- [Godot Engine](https://godotengine.org/) - The open-source game engine that provides the GDScript Language Server
+- [Disunday](https://github.com/code-xhyun/disunday) - Control OpenCode from Discord
+
+## Sponsors
+
+<a href="https://www.redimo.dev/" target="_blank">
+  <img src="https://www.redimo.dev/logo/logo.png" alt="Redimo - The Ultimate Redis GUI Client" width="120" />
+</a>
+
+**[Redimo](https://www.redimo.dev/)** - The Ultimate Redis GUI Client. Visualize, Manage, and Monitor.
