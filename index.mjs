@@ -16,6 +16,8 @@
  * - Uses Buffer for binary-safe handling (fixes data loss with large files)
  * - Auto-reconnects when Godot restarts
  * - Normalizes Windows file URIs for cross-platform compatibility
+ * - Auto-discovers Godot LSP port (tries 6005, 6007, 6008)
+ * - Protects against memory exhaustion with buffer size limits
  * 
  * @license MIT
  */
@@ -25,18 +27,27 @@ import * as fs from 'fs';
 import * as os from 'os';
 
 // Configuration
-const GODOT_LSP_PORT = parseInt(process.env.GODOT_LSP_PORT || '6005', 10);
 const GODOT_LSP_HOST = process.env.GODOT_LSP_HOST || '127.0.0.1';
 const LOG_FILE = process.env.GODOT_LSP_BRIDGE_LOG || (os.platform() === 'win32' 
   ? `${os.tmpdir()}\\godot-lsp-bridge.log` 
   : '/tmp/godot-lsp-bridge.log');
 const DEBUG = process.env.GODOT_LSP_BRIDGE_DEBUG === 'true';
 
+// Port discovery - try these ports in order
+const DEFAULT_PORTS = [6005, 6007, 6008];
+const GODOT_LSP_PORT = process.env.GODOT_LSP_PORT 
+  ? parseInt(process.env.GODOT_LSP_PORT, 10) 
+  : null;
+
 // Reconnection settings
 const RECONNECT_DELAY = 5000; // 5 seconds
 const WARMUP_DELAY = 1000; // 1 second delay after reconnect
 const MAX_RECONNECT_ATTEMPTS = -1; // -1 = infinite
 const CONNECTION_TIMEOUT = 2000; // 2 seconds
+
+// Buffer limits to prevent memory exhaustion
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_PENDING_MESSAGES = 1000;
 
 function log(msg) {
   if (!DEBUG) return;
@@ -52,7 +63,7 @@ function log(msg) {
 
 log('=== Godot LSP Bridge starting ===');
 log(`Platform: ${os.platform()}`);
-log(`Connecting to Godot LSP at ${GODOT_LSP_HOST}:${GODOT_LSP_PORT}`);
+log(`Port config: ${GODOT_LSP_PORT ? `fixed port ${GODOT_LSP_PORT}` : `auto-discover from ${DEFAULT_PORTS.join(', ')}`}`);
 
 // State
 let tcpSocket = null;
@@ -60,6 +71,7 @@ let tcpConnected = false;
 let tcpBuffer = Buffer.alloc(0);
 let stdinBuffer = Buffer.alloc(0);
 let pendingMessages = [];
+let connectedPort = null;
 
 let waitingForInitialize = false;
 let initializeRequestId = null;
@@ -132,10 +144,27 @@ function normalizeUrisInObject(obj) {
 }
 
 /**
+ * Check if buffer size is within limits.
+ */
+function checkBufferLimit(buffer, name) {
+  if (buffer.length > MAX_BUFFER_SIZE) {
+    log(`[WARNING] ${name} buffer exceeded ${MAX_BUFFER_SIZE} bytes, clearing`);
+    console.error(`Warning: ${name} buffer exceeded limit, clearing to prevent memory exhaustion`);
+    return true;
+  }
+  return false;
+}
+
+/**
  * Extract complete LSP messages from a buffer.
  * Uses Buffer for binary-safe handling to prevent data loss with large files.
  */
 function extractMessages(buffer, onMessage) {
+  // Check buffer size limit
+  if (checkBufferLimit(buffer, 'message')) {
+    return Buffer.alloc(0);
+  }
+  
   let remaining = buffer;
   
   while (true) {
@@ -156,6 +185,14 @@ function extractMessages(buffer, onMessage) {
     }
 
     const contentLength = parseInt(match[1], 10);
+    
+    // Sanity check content length
+    if (contentLength > MAX_BUFFER_SIZE) {
+      log(`[WARNING] Content-Length ${contentLength} exceeds max buffer size, skipping message`);
+      remaining = remaining.slice(headerEnd + 4);
+      continue;
+    }
+    
     const messageStart = headerEnd + 4;
     const messageEnd = messageStart + contentLength;
 
@@ -217,6 +254,11 @@ function sendToGodot(content, contentLength) {
     const byteLength = Buffer.byteLength(normalizedContent, 'utf8');
     tcpSocket.write(`Content-Length: ${byteLength}\r\n\r\n${normalizedContent}`);
   } else {
+    // Check pending messages limit
+    if (pendingMessages.length >= MAX_PENDING_MESSAGES) {
+      log(`[WARNING] Pending messages limit (${MAX_PENDING_MESSAGES}) reached, dropping oldest`);
+      pendingMessages.shift();
+    }
     log('Buffering message (not connected yet)');
     pendingMessages.push({ content: normalizedContent, contentLength: Buffer.byteLength(normalizedContent, 'utf8') });
   }
@@ -295,90 +337,151 @@ function resetConnectionState() {
 }
 
 /**
- * Connect to Godot's LSP server via TCP.
+ * Try to connect to a specific port.
  */
-function connectToGodot() {
+function tryConnectToPort(port) {
   return new Promise((resolve, reject) => {
-    log(`Connecting to ${GODOT_LSP_HOST}:${GODOT_LSP_PORT}...`);
+    log(`Trying to connect to ${GODOT_LSP_HOST}:${port}...`);
     
-    tcpSocket = new net.Socket();
-    tcpSocket.setTimeout(CONNECTION_TIMEOUT);
+    const socket = new net.Socket();
+    socket.setTimeout(CONNECTION_TIMEOUT);
     
-    tcpSocket.connect(GODOT_LSP_PORT, GODOT_LSP_HOST, () => {
-      log('Connected to Godot LSP');
-      tcpSocket.setTimeout(0);
+    const cleanup = () => {
+      socket.removeAllListeners();
+      socket.destroy();
+    };
+    
+    socket.connect(port, GODOT_LSP_HOST, () => {
+      socket.setTimeout(0);
+      log(`Successfully connected to port ${port}`);
+      resolve({ socket, port });
+    });
+
+    socket.on('timeout', () => {
+      log(`Connection timeout on port ${port}`);
+      cleanup();
+      reject(new Error(`Connection timeout on port ${port}`));
+    });
+
+    socket.on('error', (err) => {
+      log(`Connection error on port ${port}: ${err.message}`);
+      cleanup();
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Connect to Godot's LSP server via TCP with port discovery.
+ */
+async function connectToGodot() {
+  const portsToTry = GODOT_LSP_PORT ? [GODOT_LSP_PORT] : DEFAULT_PORTS;
+  
+  for (const port of portsToTry) {
+    try {
+      const result = await tryConnectToPort(port);
+      tcpSocket = result.socket;
+      connectedPort = result.port;
       tcpConnected = true;
       reconnectAttempts = 0;
       
+      // Setup socket event handlers
+      setupSocketHandlers();
+      
       if (isReconnecting) {
-        // After reconnect, clear stale messages
-        log(`Reconnected - clearing ${pendingMessages.length} stale pending messages`);
-        pendingMessages = [];
-        isReconnecting = false;
-        
-        // Warmup delay to let Godot stabilize
-        isWarmingUp = true;
-        log(`Waiting ${WARMUP_DELAY}ms for Godot to stabilize...`);
-        setTimeout(() => {
-          isWarmingUp = false;
-          log(`Warmup complete, flushing ${pendingMessages.length} buffered messages`);
-          for (const msg of pendingMessages) {
-            const byteLength = Buffer.byteLength(msg.content, 'utf8');
-            tcpSocket.write(`Content-Length: ${byteLength}\r\n\r\n${msg.content}`);
-          }
-          pendingMessages = [];
-        }, WARMUP_DELAY);
-        
-        // Notify client that server restarted
-        if (wasInitialized) {
-          log('Server restarted, notifying client');
-          sendNotificationToClient('window/showMessage', {
-            type: 2, // Warning
-            message: 'Godot LSP server restarted. You may need to reopen files for diagnostics.'
-          });
-        }
+        handleReconnection();
       } else {
-        // Initial connection - flush pending messages
-        log(`Flushing ${pendingMessages.length} pending messages`);
-        for (const msg of pendingMessages) {
-          const byteLength = Buffer.byteLength(msg.content, 'utf8');
-          tcpSocket.write(`Content-Length: ${byteLength}\r\n\r\n${msg.content}`);
-        }
-        pendingMessages = [];
+        handleInitialConnection();
       }
       
-      resolve();
-    });
+      return;
+    } catch (err) {
+      log(`Failed to connect to port ${port}: ${err.message}`);
+      // Continue to next port
+    }
+  }
+  
+  throw new Error(`Could not connect to Godot LSP on any port (tried: ${portsToTry.join(', ')})`);
+}
 
-    tcpSocket.on('timeout', () => {
-      log('Connection timeout');
-      tcpSocket.destroy();
-      reject(new Error('Connection timeout'));
-    });
-
-    tcpSocket.on('error', (err) => {
-      log(`Connection error: ${err.message}`);
-      reject(err);
-    });
+/**
+ * Setup TCP socket event handlers.
+ */
+function setupSocketHandlers() {
+  tcpSocket.on('close', () => {
+    log('TCP connection closed');
+    tcpConnected = false;
     
-    tcpSocket.on('close', () => {
-      log('TCP connection closed');
-      tcpConnected = false;
-      
-      if (!shouldKeepRunning) {
-        return;
-      }
-      
-      // Attempt reconnection
-      scheduleReconnect();
-    });
-
-    tcpSocket.on('data', (data) => {
-      tcpBuffer = Buffer.concat([tcpBuffer, data]);
-      log(`[tcp] received ${data.length} bytes, total: ${tcpBuffer.length}`);
-      tcpBuffer = extractMessages(tcpBuffer, handleGodotMessage);
-    });
+    if (!shouldKeepRunning) {
+      return;
+    }
+    
+    // Attempt reconnection
+    scheduleReconnect();
   });
+
+  tcpSocket.on('data', (data) => {
+    tcpBuffer = Buffer.concat([tcpBuffer, data]);
+    
+    // Check buffer limit
+    if (checkBufferLimit(tcpBuffer, 'TCP receive')) {
+      tcpBuffer = Buffer.alloc(0);
+      return;
+    }
+    
+    log(`[tcp] received ${data.length} bytes, total: ${tcpBuffer.length}`);
+    tcpBuffer = extractMessages(tcpBuffer, handleGodotMessage);
+  });
+  
+  tcpSocket.on('error', (err) => {
+    log(`Socket error: ${err.message}`);
+  });
+}
+
+/**
+ * Handle initial connection (not a reconnection).
+ */
+function handleInitialConnection() {
+  log(`Flushing ${pendingMessages.length} pending messages`);
+  for (const msg of pendingMessages) {
+    const byteLength = Buffer.byteLength(msg.content, 'utf8');
+    tcpSocket.write(`Content-Length: ${byteLength}\r\n\r\n${msg.content}`);
+  }
+  pendingMessages = [];
+}
+
+/**
+ * Handle reconnection after disconnect.
+ */
+function handleReconnection() {
+  // After reconnect, clear stale messages
+  log(`Reconnected - clearing ${pendingMessages.length} stale pending messages`);
+  pendingMessages = [];
+  isReconnecting = false;
+  
+  // Warmup delay to let Godot stabilize
+  isWarmingUp = true;
+  log(`Waiting ${WARMUP_DELAY}ms for Godot to stabilize...`);
+  setTimeout(() => {
+    isWarmingUp = false;
+    log(`Warmup complete, flushing ${pendingMessages.length} buffered messages`);
+    for (const msg of pendingMessages) {
+      const byteLength = Buffer.byteLength(msg.content, 'utf8');
+      if (tcpSocket && !tcpSocket.destroyed) {
+        tcpSocket.write(`Content-Length: ${byteLength}\r\n\r\n${msg.content}`);
+      }
+    }
+    pendingMessages = [];
+  }, WARMUP_DELAY);
+  
+  // Notify client that server restarted
+  if (wasInitialized) {
+    log('Server restarted, notifying client');
+    sendNotificationToClient('window/showMessage', {
+      type: 2, // Warning
+      message: 'Godot LSP server restarted. You may need to reopen files for diagnostics.'
+    });
+  }
 }
 
 /**
@@ -412,7 +515,7 @@ function scheduleReconnect() {
     
     try {
       await connectToGodot();
-      console.error(`Reconnected to Godot LSP on port ${GODOT_LSP_PORT}`);
+      console.error(`Reconnected to Godot LSP on port ${connectedPort}`);
     } catch (err) {
       log(`Reconnect failed: ${err.message}`);
       scheduleReconnect();
@@ -429,10 +532,22 @@ function setupStdinReader() {
   process.stdin.on('data', (chunk) => {
     log(`stdin data: ${chunk.length} bytes`);
     stdinBuffer = Buffer.concat([stdinBuffer, chunk]);
+    
+    // Check buffer limit
+    if (checkBufferLimit(stdinBuffer, 'stdin')) {
+      stdinBuffer = Buffer.alloc(0);
+      return;
+    }
+    
     log(`[buffer] total stdin buffer: ${stdinBuffer.length} bytes`);
     
     stdinBuffer = extractMessages(stdinBuffer, (content, contentLength) => {
       if (!tcpConnected || isWarmingUp) {
+        // Check pending messages limit
+        if (pendingMessages.length >= MAX_PENDING_MESSAGES) {
+          log(`[WARNING] Pending messages limit (${MAX_PENDING_MESSAGES}) reached, dropping oldest`);
+          pendingMessages.shift();
+        }
         log(`Buffering message - ${!tcpConnected ? 'not connected' : 'warming up'}`);
         pendingMessages.push({ content, contentLength });
         return;
@@ -536,7 +651,7 @@ async function main() {
   await connectWithInitialRetry();
   
   if (tcpConnected) {
-    console.error(`Godot LSP Bridge started (connected to port ${GODOT_LSP_PORT})`);
+    console.error(`Godot LSP Bridge started (connected to port ${connectedPort})`);
   }
 }
 
